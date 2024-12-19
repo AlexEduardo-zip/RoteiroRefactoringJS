@@ -8,32 +8,42 @@ function formatarMoeda(valor) {
   }).format(valor / 100);
 }
 
-function getPeca(pecas, apresentacao) {
-  return pecas[apresentacao.id];
+class Repositorio {
+  constructor() {
+    this.pecas = JSON.parse(readFileSync('./pecas.json'));
+  }
+
+  getPeca(apre) {
+    return this.pecas[apre.id];
+  }
 }
 
 class ServicoCalculoFatura {
 
-  calcularCredito(pecas, apre) {
+  constructor(repo) {
+    this.repo = repo;
+  }
+
+  calcularCredito(apre) {
     let creditos = 0;
     creditos += Math.max(apre.audiencia - 30, 0);
-    if (getPeca(pecas, apre).tipo === "comedia") 
+    if (this.repo.getPeca(apre).tipo === "comedia") 
        creditos += Math.floor(apre.audiencia / 5);
     return creditos;   
   }
 
-  calcularTotalCreditos(pecas, apresentacoes) {
+  calcularTotalCreditos(apresentacoes) {
     let creditos = 0;
     for (let apre of apresentacoes) {
-      creditos += this.calcularCredito(pecas, apre);
+      creditos += this.calcularCredito(apre);
     }
     return creditos;
   }
 
-  calcularTotalApresentacao(pecas, apre) {
+  calcularTotalApresentacao(apre) {
     let total = 0;
 
-    switch (getPeca(pecas, apre).tipo) {
+    switch (this.repo.getPeca(apre).tipo) {
       case "tragedia":
         total = 40000;
         if (apre.audiencia > 30) {
@@ -48,58 +58,33 @@ class ServicoCalculoFatura {
         total += 300 * apre.audiencia;
         break;
       default:
-        throw new Error(`Peça desconhecia: ${getPeca(pecas, apre).tipo}`);
+        throw new Error(`Peça desconhecia: ${this.repo.getPeca(apre).tipo}`);
     }
     return total;
   }
 
-  calcularTotalFatura(pecas, apresentacoes) {
+  calcularTotalFatura(apresentacoes) {
     let total = 0;
     for (let apre of apresentacoes) {
-      total += this.calcularTotalApresentacao(pecas, apre);
+      total += this.calcularTotalApresentacao(apre);
     }
     return total;
   }
 }
 
-function gerarFaturaStr(fatura, pecas, calc) {
+function gerarFaturaStr(fatura, calc) {
   let faturaStr = `Fatura ${fatura.cliente}\n`;
   for (let apre of fatura.apresentacoes) {
-    faturaStr += `  ${getPeca(pecas, apre).nome}: ${formatarMoeda(calc.calcularTotalApresentacao(pecas, apre))} (${apre.audiencia} assentos)\n`;
+    faturaStr += `  ${calc.repo.getPeca(apre).nome}: ${formatarMoeda(calc.calcularTotalApresentacao(apre))} (${apre.audiencia} assentos)\n`;
   }
 
-  faturaStr += `Valor total: ${formatarMoeda(calc.calcularTotalFatura(pecas, fatura.apresentacoes))}\n`;
-  faturaStr += `Créditos acumulados: ${calc.calcularTotalCreditos(pecas, fatura.apresentacoes)} \n`;
+  faturaStr += `Valor total: ${formatarMoeda(calc.calcularTotalFatura(fatura.apresentacoes))}\n`;
+  faturaStr += `Créditos acumulados: ${calc.calcularTotalCreditos(fatura.apresentacoes)} \n`;
   return faturaStr;
 }
 
-// function gerarFaturaHTML(fatura, pecas, calc) {
-//   let faturaHTML = `<html>\n<p>Fatura ${fatura.cliente}</p>\n<ul>\n`;
+const faturas = JSON.parse(readFileSync('./faturas.json'));
+const calc = new ServicoCalculoFatura(new Repositorio());
 
-//   for (let apre of fatura.apresentacoes) {
-//     let peca = getPeca(pecas, apre);
-//     let totalApresentacao = calc.calcularTotalApresentacao(pecas, apre);
-//     faturaHTML += `  <li>${peca.nome}: ${formatarMoeda(totalApresentacao)} (${apre.audiencia} assentos)</li>\n`;
-//   }
-
-//   let totalFatura = calc.calcularTotalFatura(pecas, fatura.apresentacoes);
-//   let totalCreditos = calc.calcularTotalCreditos(pecas, fatura.apresentacoes);
-
-//   faturaHTML += `</ul>\n<p>Valor total: ${formatarMoeda(totalFatura)}</p>\n`;
-//   faturaHTML += `<p>Créditos acumulados: ${totalCreditos}</p>\n`;
-
-//   faturaHTML += `</html>\n`;
-
-//   return faturaHTML;
-// }
-
-const faturas = JSON.parse(readFileSync("./faturas.json"));
-const pecas = JSON.parse(readFileSync("./pecas.json"));
-
-const calc = new ServicoCalculoFatura();
-
-const faturaStr = gerarFaturaStr(faturas, pecas, calc);
-// const faturaHTML = gerarFaturaHTML(faturas, pecas, calc);
-
+const faturaStr = gerarFaturaStr(faturas, calc);
 console.log(faturaStr);
-// console.log(faturaHTML);
